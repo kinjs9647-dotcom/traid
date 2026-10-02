@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="트레이드">
+<meta name="theme-color" content="#0A0E12">
+<link rel="manifest" href="manifest.json">
+<title>복리 목표 트래커</title>
+<style>
+  :root{
+    --bg:#0A0E12; --surface:#10151B; --surface-2:#161D24; --border:#1E2730;
+    --text:#E8ECEF; --text-dim:#7C8794;
+    --green:#00D9A3; --blue:#5B8CFF; --purple:#B98BFF; --gold:#F0B90B;
+    --rose:#FF5C72;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{
+    background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100dvh;
+  }
+  body{ padding-top: var(--safe-top); }
+  .mono{font-family:ui-monospace,SFMono-Regular,Consolas,Menlo,monospace;}
+
+  /* 상단 바 */
+  .topbar{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:14px 16px 10px;border-bottom:1px solid var(--border);
+    position:sticky;top:0;z-index:10;background:var(--bg);
+  }
+  .topbar .label{font-size:11px;letter-spacing:0.12em;color:var(--text-dim);text-transform:uppercase;font-weight:600;}
+  .week-badge{font-family:ui-monospace,monospace;font-size:12px;color:var(--text);background:var(--surface-2);border:1px solid var(--border);padding:4px 11px;border-radius:20px;}
+  .sync-badge{font-size:9px;color:var(--blue);text-align:center;padding:4px 0;background:var(--bg);}
+
+  .wrap{padding:12px 14px 100px;}
+
+  /* 4칸 스탯 */
+  .stats-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;}
+  .stat-item{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:11px 10px;text-align:center;}
+  .stat-label{font-size:10px;color:var(--text-dim);margin-bottom:4px;}
+  .stat-value{font-family:ui-monospace,monospace;font-size:16px;font-weight:700;}
+
+  /* 탭 */
+  .tab-bar{display:flex;gap:7px;margin-bottom:14px;}
+  .tab-btn{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);font-size:12px;font-weight:600;padding:9px 0;border-radius:10px;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent;}
+  .tab-btn.active{background:var(--surface-2);border-color:var(--green);color:var(--green);}
+
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* 히어로 */
+  .hero{background:linear-gradient(160deg,var(--surface) 0%,var(--surface-2) 100%);border:1px solid var(--border);border-radius:16px;padding:16px 15px;margin-bottom:14px;position:relative;overflow:hidden;}
+  .hero::before{content:'';position:absolute;top:-40%;right:-30%;width:220px;height:220px;border-radius:50%;background:radial-gradient(circle,rgba(0,217,163,0.09),transparent 70%);pointer-events:none;}
+  .hero .sub{font-size:11px;color:var(--text-dim);margin-bottom:2px;}
+  .hero .today-label{font-size:14px;font-weight:600;margin-bottom:12px;}
+  .tier-pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:4px 11px;border-radius:20px;margin-bottom:12px;}
+  .tier-pill .dot{width:6px;height:6px;border-radius:50%;}
+
+  .quick-input{display:flex;gap:8px;margin-bottom:13px;}
+  .quick-input input{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:ui-monospace,monospace;font-size:16px;padding:10px 11px;border-radius:10px;}
+  .quick-input input:focus{outline:none;border-color:var(--green);}
+  .quick-input button{background:var(--green);color:#04221A;border:none;font-weight:700;font-size:14px;padding:0 18px;border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+
+  .progress-row{display:flex;gap:14px;flex-wrap:wrap;}
+  .meta-item{font-size:11px;color:var(--text-dim);}
+  .meta-item b{color:var(--text);font-family:ui-monospace,monospace;font-size:14px;display:block;margin-top:3px;}
+
+  /* 카드 */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 14px;margin-bottom:14px;}
+  .card h2{font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:var(--text-dim);font-weight:600;margin-bottom:12px;}
+
+  /* 일별 */
+  .days{display:flex;flex-direction:column;gap:8px;}
+  .day-row{display:flex;align-items:center;gap:8px;}
+  .day-date{font-size:11px;color:var(--text-dim);width:56px;font-family:ui-monospace,monospace;}
+  .day-row.today .day-date{color:var(--text);font-weight:700;}
+  .day-input{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:ui-monospace,monospace;font-size:14px;padding:8px 10px;border-radius:8px;}
+  .day-input:focus{outline:none;border-color:var(--green);}
+  .day-running{font-size:10px;color:var(--text-dim);width:64px;text-align:right;font-family:ui-monospace,monospace;}
+
+  /* 차트 */
+  .chart-canvas{display:block;width:100%;}
+
+  /* 주차별 히스토리 */
+  .wh-list{display:flex;flex-direction:column;gap:7px;}
+  .wh-row{display:flex;align-items:center;gap:7px;font-size:11px;}
+  .wh-label{color:var(--text-dim);font-family:ui-monospace,monospace;min-width:38px;}
+  .wh-bar-wrap{flex:1;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;}
+  .wh-bar{height:100%;border-radius:3px;}
+  .wh-profit{font-family:ui-monospace,monospace;font-size:11px;min-width:58px;text-align:right;}
+  .wh-pct{font-family:ui-monospace,monospace;font-size:11px;min-width:42px;text-align:right;color:var(--text-dim);}
+  .wh-empty{font-size:11px;color:var(--text-dim);text-align:center;padding:14px 0;}
+
+  /* 하단 바 */
+  .footnote{font-size:10px;color:var(--text-dim);text-align:center;margin-top:14px;line-height:1.6;}
+  .reset-btn{display:block;margin:12px auto 0;background:none;border:1px solid var(--border);color:var(--text-dim);font-size:11px;padding:7px 16px;border-radius:20px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+
+  /* 저장 표시 */
+  .save-indicator{
+    position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;
+    transform:translateX(-50%) translateY(10px);
+    background:var(--green);color:#04221A;font-size:11px;font-weight:600;
+    padding:8px 16px;border-radius:20px;opacity:0;transition:all .25s ease;
+    pointer-events:none;z-index:100;white-space:nowrap;
+  }
+  .save-indicator.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* 동기화 상태 */
+  .sync-status{font-size:9px;color:var(--text-dim);text-align:center;padding:3px 0;}
+  .sync-status.ok{color:var(--green);}
+  .sync-status.err{color:var(--rose);}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="label">Daily Compound Log</div>
+  <div class="week-badge mono" id="weekBadge">WEEK —</div>
+</div>
+<div class="sync-badge" id="syncBadge">⟲ Firebase 동기화</div>
+
+<div class="wrap">
+  <!-- 4칸 스탯 -->
+  <div class="stats-row">
+    <div class="stat-item">
+      <div class="stat-label">시작 시드</div>
+      <div class="stat-value mono" id="statStart">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">현재 시드</div>
+      <div class="stat-value mono" id="statCurrent">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">월 목표 시드</div>
+      <div class="stat-value mono" id="statTarget">—</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-label">총 수익률</div>
+      <div class="stat-value mono" id="statReturn">—</div>
+    </div>
+  </div>
+
+  <!-- 탭 -->
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnWeek">이번 주</button>
+    <button class="tab-btn" id="tabBtnChart">성장 곡선</button>
+  </div>
+
+  <!-- 탭 1: 이번 주 -->
+  <div class="tab-panel active" id="panelWeek">
+    <div class="hero">
+      <div class="sub" id="heroSub">이번 주</div>
+      <div class="today-label" id="todayLabel">—</div>
+      <div class="tier-pill" id="tierPill"><span class="dot"></span><span id="tierPillText">목표 비율 —</span></div>
+      <div class="quick-input">
+        <input type="number" id="quickInput" placeholder="오늘 수익/손실 ($, 손실은 -)">
+        <button id="quickSave">저장</button>
+      </div>
+      <div class="progress-row">
+        <div class="meta-item">이번 달 누적<b id="metaWeekActual">—</b></div>
+        <div class="meta-item">월 목표까지<b id="metaRemaining">—</b></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>이번 주 일별 입력</h2>
+      <div class="days" id="daysList"></div>
+    </div>
+
+    <div class="footnote">매일 그날의 수익/손실을 입력하면 자동 저장.</div>
+    <button class="reset-btn" id="resetBtn">전체 입력 초기화</button>
+  </div>
+
+  <!-- 탭 2: 성장 곡선 -->
+  <div class="tab-panel" id="panelChart">
+    <div class="card">
+      <h2>월별 성장 곡선</h2>
+      <canvas id="monthChart" class="chart-canvas" height="140"></canvas>
+    </div>
+    <div class="card">
+      <h2>주차별 실적</h2>
+      <div class="wh-list" id="weekHistory"></div>
+    </div>
+  </div>
+</div>
+
+<div class="save-indicator" id="saveIndicator">저장됨 ↗</div>
+
+<script>
+// ── 상수 ──────────────────────────────────────────────
+const ORIG_START_BALANCE = 1300;
+const ORIG_START_DATE    = new Date('2026-06-15T00:00:00');
+const START_DATE    = new Date('2026-10-02T00:00:00');
+const START_BALANCE = 2500;
+const DAY_LABELS    = ['월','화','수','목','금','토','일'];
+
+const MONTHLY_SNAPSHOTS_BASE = {
+  '2026-06': 1400,
+  '2026-07': 1800,
+  '2026-08': 2500,
+  '2026-09': 2500,
+};
+
+// ── Firebase REST ──────────────────────────────────────
+const FB_API_KEY  = 'AIzaSyD8NkutQnaZM5RfDAdEQDk65bHH5yy0hng';
+const FB_PROJECT  = 'traid-bd867';
+const FB_DOC_URL  = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents/tracker/main?key=${FB_API_KEY}`;
+
+async function fbRead() {
+  try {
+    const res = await fetch(FB_DOC_URL);
+    if (res.status === 404) return { daily: {}, snaps: {} }; // 문서 없음 = 빈 데이터
+    if (!res.ok) return null;
+    const doc = await res.json();
+    const fields = doc.fields || {};
+    return {
+      daily: fields.dailyData ? JSON.parse(fields.dailyData.stringValue) : {},
+      snaps: fields.snapshots ? JSON.parse(fields.snapshots.stringValue) : {},
+    };
+  } catch(e) { return null; }
+}
+
+async function fbWrite(daily, snaps) {
+  try {
+    const url = FB_DOC_URL + '&updateMask.fieldPaths=dailyData&updateMask.fieldPaths=snapshots';
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fields: {
+          dailyData: { stringValue: JSON.stringify(daily) },
+          snapshots: { stringValue: JSON.stringify(snaps) },
+        }
+      })
+    });
+    return res.ok;
+  } catch(e) { return false; }
+}
+
+// ── 상태 ──────────────────────────────────────────────
+let dailyData = {};
+let storedSnapshots = {};
+
+async function loadAll() {
+  const fb = await fbRead();
+  if (fb) {
+    dailyData = fb.daily;
+    storedSnapshots = fb.snaps;
+    setSyncStatus('연결됨', true);
+  } else {
+    // 로컬스토리지 폴백
+    try {
+      const d = localStorage.getItem('traid-daily');
+      const s = localStorage.getItem('traid-snaps');
+      if (d) dailyData = JSON.parse(d);
+      if (s) storedSnapshots = JSON.parse(s);
+    } catch(e) {}
+    setSyncStatus('오프라인', false);
+  }
+}
+
+async function persistSilently() {
+  try {
+    localStorage.setItem('traid-daily', JSON.stringify(dailyData));
+    localStorage.setItem('traid-snaps', JSON.stringify(storedSnapshots));
+  } catch(e) {}
+  const ok = await fbWrite(dailyData, storedSnapshots);
+  setSyncStatus(ok ? '동기화됨' : '오프라인', ok);
+}
+
+function setSyncStatus(msg, ok) {
+  const el = document.getElementById('syncBadge');
+  el.textContent = ok ? `✓ ${msg}` : `⚠ ${msg}`;
+  el.style.color = ok ? 'var(--green)' : 'var(--rose)';
+}
+
+// ── 티어 ──────────────────────────────────────────────
+function tierFor(balance) {
+  if (balance < 2000)  return { rate: 0.10, hex: '#00D9A3', label: '10%' };
+  if (balance < 5000)  return { rate: 0.07, hex: '#5B8CFF', label: '7%'  };
+  if (balance < 10000) return { rate: 0.05, hex: '#B98BFF', label: '5%'  };
+  return                      { rate: 0.03, hex: '#F0B90B', label: '3%'  };
+}
+
+// ── 유틸 ──────────────────────────────────────────────
+function fmt(n)    { return (n < 0 ? '-' : '') + '$' + Math.abs(Math.round(n)).toLocaleString('en-US'); }
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(1) + '%'; }
+function addDays(date, days) { const d = new Date(date); d.setDate(d.getDate() + days); return d; }
+function fmtDate(d) { return (d.getMonth() + 1) + '/' + d.getDate(); }
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function monthKey(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
+
+async function autoSnapshotPrevMonths(schedule) {
+  const today   = new Date();
+  const curMKey = monthKey(today);
+  let changed   = false;
+  const monthEndMap = {};
+  schedule.forEach(wk => {
+    const mk = monthKey(wk.weekStart);
+    if (mk === curMKey) return;
+    if (MONTHLY_SNAPSHOTS_BASE[mk] !== undefined) return;
+    if (storedSnapshots[mk] !== undefined) return;
+    if (wk.hasAny || monthEndMap[mk]) monthEndMap[mk] = wk.actualSoFar;
+  });
+  Object.entries(monthEndMap).forEach(([mk, val]) => { storedSnapshots[mk] = val; changed = true; });
+  if (changed) await persistSilently();
+}
+
+function allSnapshots() { return { ...MONTHLY_SNAPSHOTS_BASE, ...storedSnapshots }; }
+
+function todayInfo() {
+  const today = startOfDay(new Date());
+  let diffDays = Math.floor((today - START_DATE) / (1000 * 60 * 60 * 24));
+  if (diffDays < 0) diffDays = 0;
+  return { week: Math.floor(diffDays / 7) + 1, day: diffDays % 7, today };
+}
+
+function buildSchedule() {
+  const { today, week: todayWeek } = todayInfo();
+  let balance = START_BALANCE;
+  const weeks = [];
+  let cur = new Date(START_DATE);
+  let prevBaseTarget = 0, prevActualSum = 0;
+
+  for (let w = 1; w <= todayWeek; w++) {
+    const tier = tierFor(balance);
+    const startBal = balance;
+    const baseTargetProfit = startBal * tier.rate;
+    const weekStart = new Date(cur);
+    const weekEnd = addDays(cur, 6);
+    const days = [];
+    let cum = 0;
+    for (let d = 0; d < 7; d++) {
+      const date = addDays(weekStart, d);
+      const val = (dailyData[w] && dailyData[w][d] !== undefined) ? dailyData[w][d] : null;
+      if (val !== null) cum += val;
+      days.push({ d, date, val, running: startBal + cum });
+    }
+    const hasAny = days.some(x => x.val !== null);
+    const actualSum = cum;
+    const actualSoFar = startBal + cum;
+    const closed = today > weekEnd;
+    const prevOverage = w > 1 ? Math.max(0, prevActualSum - prevBaseTarget) : 0;
+    const adjTargetProfit = baseTargetProfit - prevOverage;
+    weeks.push({ week: w, startBal, baseTargetProfit, adjTargetProfit, tier, weekStart, weekEnd, days, actualSoFar, actualSum, hasAny, closed });
+    balance = closed ? (hasAny ? actualSoFar : startBal) : actualSoFar;
+    prevBaseTarget = baseTargetProfit;
+    prevActualSum = actualSum;
+    cur = addDays(cur, 7);
+  }
+  return weeks;
+}
+
+function calcMonthTarget(currentBal) {
+  return currentBal * (1 + tierFor(currentBal).rate);
+}
+
+// ── 탭 ────────────────────────────────────────────────
+function switchTab(tab) {
+  document.getElementById('panelWeek').classList.toggle('active', tab === 'week');
+  document.getElementById('panelChart').classList.toggle('active', tab === 'chart');
+  document.getElementById('tabBtnWeek').classList.toggle('active', tab === 'week');
+  document.getElementById('tabBtnChart').classList.toggle('active', tab === 'chart');
+  if (tab === 'chart') { const s = buildSchedule(); renderMonthChart(s); renderWeekHistory(s); }
+}
+
+// ── 렌더 ──────────────────────────────────────────────
+function renderStats(wk) {
+  document.getElementById('statStart').textContent   = fmt(ORIG_START_BALANCE);
+  document.getElementById('statCurrent').textContent = fmt(wk.actualSoFar);
+  document.getElementById('statTarget').textContent  = fmt(calcMonthTarget(wk.actualSoFar));
+  const pct = (wk.actualSoFar - ORIG_START_BALANCE) / ORIG_START_BALANCE * 100;
+  const el = document.getElementById('statReturn');
+  el.textContent = fmtPct(pct);
+  el.style.color = pct >= 0 ? 'var(--green)' : 'var(--rose)';
+}
+
+function renderHero(wk, day, today) {
+  document.getElementById('weekBadge').textContent  = 'WEEK ' + wk.week;
+  document.getElementById('heroSub').textContent    = fmtDate(wk.weekStart) + ' ~ ' + fmtDate(wk.weekEnd) + ' (이번 주)';
+  document.getElementById('todayLabel').textContent = fmtDate(today) + ' · ' + DAY_LABELS[day] + '요일';
+  const existing = (dailyData[wk.week] && dailyData[wk.week][day] !== undefined) ? dailyData[wk.week][day] : '';
+  document.getElementById('quickInput').value = existing;
+
+  const pill = document.getElementById('tierPill');
+  pill.style.background = wk.tier.hex + '1A';
+  pill.style.color = wk.tier.hex;
+  pill.querySelector('.dot').style.background = wk.tier.hex;
+  document.getElementById('tierPillText').textContent = '목표 비율 ' + wk.tier.label;
+
+  const curMKey = monthKey(today);
+  const fullSchedule = buildSchedule();
+  const monthProfit = fullSchedule.filter(s => monthKey(s.weekStart) === curMKey).reduce((sum, s) => sum + s.actualSum, 0);
+  const monthTargetProfit = START_BALANCE * tierFor(START_BALANCE).rate;
+
+  const actualEl = document.getElementById('metaWeekActual');
+  actualEl.textContent = (monthProfit >= 0 ? '+' : '') + fmt(monthProfit);
+  actualEl.style.color = monthProfit >= monthTargetProfit ? 'var(--green)' : (monthProfit < 0 ? 'var(--rose)' : 'var(--text)');
+
+  const remEl = document.getElementById('metaRemaining');
+  const rem = monthTargetProfit - monthProfit;
+  if (rem <= 0) { remEl.textContent = '+' + fmt(-rem) + ' 초과'; remEl.style.color = 'var(--green)'; }
+  else { remEl.textContent = fmt(rem) + ' 남음'; remEl.style.color = 'var(--text)'; }
+}
+
+function renderDays(wk, todayDay) {
+  const container = document.getElementById('daysList');
+  container.innerHTML = '';
+  wk.days.forEach(dayObj => {
+    const row = document.createElement('div');
+    row.className = 'day-row' + (dayObj.d === todayDay ? ' today' : '');
+    row.innerHTML = `
+      <span class="day-date">${DAY_LABELS[dayObj.d]} ${fmtDate(dayObj.date)}</span>
+      <input class="day-input mono" type="number" inputmode="decimal" placeholder="0"
+             value="${dayObj.val !== null ? dayObj.val : ''}" data-day="${dayObj.d}">
+      <span class="day-running">${dayObj.val !== null ? fmt(dayObj.running) : ''}</span>
+    `;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('.day-input').forEach(input => {
+    input.addEventListener('change', e => {
+      const d = parseInt(e.target.dataset.day);
+      const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+      saveDaily(wk.week, d, val);
+    });
+  });
+}
+
+function renderMonthChart(schedule) {
+  const canvas = document.getElementById('monthChart');
+  if (!canvas) return;
+  canvas.width = canvas.offsetWidth;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  const pad = { t: 14, r: 24, b: 32, l: 52 };
+
+  const today = new Date();
+  const curMKey = monthKey(today);
+  const monthMap = allSnapshots();
+  if (schedule.length > 0) {
+    const lastWk = schedule[schedule.length - 1];
+    if (schedule.some(wk => monthKey(wk.weekStart) === curMKey && wk.hasAny))
+      monthMap[curMKey] = lastWk.actualSoFar;
+  }
+
+  const sortedKeys = Object.keys(monthMap).sort();
+  const points = [
+    { label: '6/15', val: ORIG_START_BALANCE },
+    ...sortedKeys.map((k, i) => ({
+      label: i === sortedKeys.length - 1 ? '현재' : parseInt(k.slice(5)) + '월말',
+      val: monthMap[k],
+    }))
+  ];
+
+  const vals = points.map(p => p.val);
+  const minV = Math.min(...vals) * 0.90;
+  const maxV = Math.max(...vals) * 1.08;
+  const n = points.length;
+
+  function px(i) { return pad.l + (i / (n - 1)) * (W - pad.l - pad.r); }
+  function py(v) { return pad.t + (1 - (v - minV) / (maxV - minV)) * (H - pad.t - pad.b); }
+
+  ctx.clearRect(0, 0, W, H);
+  ctx.strokeStyle = '#1E2730'; ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach(f => {
+    const y = pad.t + f * (H - pad.t - pad.b);
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(W - pad.r, y); ctx.stroke();
+    const v = maxV - f * (maxV - minV);
+    ctx.fillStyle = '#7C8794'; ctx.font = '10px ui-monospace,monospace'; ctx.textAlign = 'right';
+    ctx.fillText('$' + (Math.round(v / 100) * 100).toLocaleString(), pad.l - 5, y + 4);
+  });
+
+  ctx.lineWidth = 2.5; ctx.setLineDash([]);
+  for (let i = 1; i < n; i++) {
+    const x1 = px(i-1), y1 = py(vals[i-1]), x2 = px(i), y2 = py(vals[i]);
+    const isLoss = vals[i] < vals[i-1];
+    const wasLoss = i > 1 && vals[i-1] < vals[i-2];
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+    grad.addColorStop(0, wasLoss ? '#FF5C72' : '#00D9A3');
+    grad.addColorStop(1, isLoss  ? '#FF5C72' : '#00D9A3');
+    ctx.strokeStyle = grad;
+    ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  }
+
+  points.forEach((p, i) => {
+    const isLoss = i > 0 && p.val < points[i-1].val;
+    ctx.fillStyle = isLoss ? '#FF5C72' : '#00D9A3';
+    ctx.beginPath(); ctx.arc(px(i), py(p.val), 5, 0, Math.PI * 2); ctx.fill();
+    if (i === 0 || i === n - 1) {
+      ctx.fillStyle = '#E8ECEF';
+      ctx.font = '9.5px ui-monospace,monospace';
+      ctx.textAlign = i === 0 ? 'left' : 'right';
+      ctx.fillText(fmt(p.val), i === 0 ? px(i) + 7 : px(i) - 7, py(p.val) - 9);
+    }
+  });
+
+  ctx.fillStyle = '#7C8794'; ctx.font = '9px ui-monospace,monospace';
+  points.forEach((p, i) => {
+    ctx.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
+    ctx.fillText(p.label, px(i), H - 6);
+  });
+}
+
+function renderWeekHistory(schedule) {
+  const container = document.getElementById('weekHistory');
+  container.innerHTML = '';
+  if (!schedule.length) { container.innerHTML = '<div class="wh-empty">아직 입력된 데이터가 없어</div>'; return; }
+  const maxAbs = Math.max(...schedule.map(wk => Math.abs(wk.actualSum)), 1);
+  schedule.forEach(wk => {
+    const isPos = wk.actualSum >= 0;
+    const color = isPos ? '#00D9A3' : '#FF5C72';
+    const barW = Math.abs(wk.actualSum) / maxAbs * 100;
+    const pct = wk.startBal > 0 ? (wk.actualSum / wk.startBal * 100) : 0;
+    const row = document.createElement('div');
+    row.className = 'wh-row';
+    row.innerHTML = `
+      <span class="wh-label">W${wk.week}</span>
+      <div class="wh-bar-wrap"><div class="wh-bar" style="width:${barW}%;background:${color};"></div></div>
+      <span class="wh-profit" style="color:${color}">${isPos ? '+' : ''}${fmt(wk.actualSum)}</span>
+      <span class="wh-pct">${isPos ? '+' : ''}${pct.toFixed(1)}%</span>
+    `;
+    container.appendChild(row);
+  });
+}
+
+function saveDaily(week, day, value) {
+  if (!dailyData[week]) dailyData[week] = {};
+  if (value === '' || value === null || isNaN(value)) delete dailyData[week][day];
+  else dailyData[week][day] = value;
+  flashSaved('저장됨 ↗');
+  renderAll();
+  persistSilently();
+}
+
+function flashSaved(msg) {
+  const el = document.getElementById('saveIndicator');
+  el.textContent = msg || '저장됨';
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1500);
+}
+
+function renderAll() {
+  const schedule = buildSchedule();
+  const wk = schedule[schedule.length - 1];
+  const { day, today } = todayInfo();
+  renderStats(wk);
+  renderHero(wk, day, today);
+  renderDays(wk, day);
+  if (document.getElementById('panelChart').classList.contains('active')) {
+    renderMonthChart(schedule);
+    renderWeekHistory(schedule);
+  }
+}
+
+// ── 이벤트 ────────────────────────────────────────────
+document.getElementById('tabBtnWeek').addEventListener('click', () => switchTab('week'));
+document.getElementById('tabBtnChart').addEventListener('click', () => switchTab('chart'));
+document.getElementById('quickSave').addEventListener('click', () => {
+  const { week, day } = todayInfo();
+  const val = document.getElementById('quickInput').value;
+  saveDaily(week, day, val === '' ? '' : parseFloat(val));
+});
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (!confirm('입력한 모든 일별 데이터를 초기화할까?')) return;
+  dailyData = {};
+  renderAll();
+  persistSilently();
+});
+
+// ── Service Worker ────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ── 초기화 ────────────────────────────────────────────
+(async function init() {
+  await loadAll();
+  const schedule = buildSchedule();
+  await autoSnapshotPrevMonths(schedule);
+  renderAll();
+})();
+</script>
+</body>
+</html>
