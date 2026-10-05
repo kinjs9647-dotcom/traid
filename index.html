@@ -66,6 +66,8 @@
   .quick-input input{flex:1;background:var(--surface-2);border:1px solid var(--border);color:var(--text);font-family:ui-monospace,monospace;font-size:16px;padding:10px 11px;border-radius:10px;}
   .quick-input input:focus{outline:none;border-color:var(--green);}
   .quick-input button{background:var(--green);color:#04221A;border:none;font-weight:700;font-size:14px;padding:0 18px;border-radius:10px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+  .today-total{font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:11px;min-height:18px;}
+  .today-total b{color:var(--green);font-family:ui-monospace,monospace;}
 
   .progress-row{display:flex;gap:14px;flex-wrap:wrap;}
   .meta-item{font-size:11px;color:var(--text-dim);}
@@ -159,9 +161,10 @@
       <div class="today-label" id="todayLabel">—</div>
       <div class="tier-pill" id="tierPill"><span class="dot"></span><span id="tierPillText">목표 비율 —</span></div>
       <div class="quick-input">
-        <input type="number" id="quickInput" placeholder="오늘 수익/손실 ($, 손실은 -)">
-        <button id="quickSave">저장</button>
+        <input type="number" id="quickInput" placeholder="추가할 금액 ($, 손실은 -)">
+        <button id="quickSave">추가</button>
       </div>
+      <div class="today-total" id="todayTotal"></div>
       <div class="progress-row">
         <div class="meta-item">이번 달 누적<b id="metaWeekActual">—</b></div>
         <div class="meta-item">월 목표까지<b id="metaRemaining">—</b></div>
@@ -215,7 +218,7 @@ const FB_DOC_URL  = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/
 async function fbRead() {
   try {
     const res = await fetch(FB_DOC_URL);
-    if (res.status === 404) return { daily: {}, snaps: {} }; // 문서 없음 = 빈 데이터
+    if (res.status === 404) return { daily: {}, snaps: {} };
     if (!res.ok) return null;
     const doc = await res.json();
     const fields = doc.fields || {};
@@ -254,7 +257,6 @@ async function loadAll() {
     storedSnapshots = fb.snaps;
     setSyncStatus('연결됨', true);
   } else {
-    // 로컬스토리지 폴백
     try {
       const d = localStorage.getItem('traid-daily');
       const s = localStorage.getItem('traid-snaps');
@@ -385,8 +387,14 @@ function renderHero(wk, day, today) {
   document.getElementById('weekBadge').textContent  = 'WEEK ' + wk.week;
   document.getElementById('heroSub').textContent    = fmtDate(wk.weekStart) + ' ~ ' + fmtDate(wk.weekEnd) + ' (이번 주)';
   document.getElementById('todayLabel').textContent = fmtDate(today) + ' · ' + DAY_LABELS[day] + '요일';
-  const existing = (dailyData[wk.week] && dailyData[wk.week][day] !== undefined) ? dailyData[wk.week][day] : '';
-  document.getElementById('quickInput').value = existing;
+  const existing = (dailyData[wk.week] && dailyData[wk.week][day] !== undefined) ? dailyData[wk.week][day] : null;
+  const totalEl = document.getElementById('todayTotal');
+  if (existing !== null && existing !== '') {
+    const sign = existing >= 0 ? '+' : '';
+    totalEl.innerHTML = `오늘 누적 합계: <b>${sign}${fmt(existing)}</b>`;
+  } else {
+    totalEl.innerHTML = '';
+  }
 
   const pill = document.getElementById('tierPill');
   pill.style.background = wk.tier.hex + '1A';
@@ -529,11 +537,21 @@ function renderWeekHistory(schedule) {
   });
 }
 
-function saveDaily(week, day, value) {
+// mode: 'set' = 덮어쓰기(주간 그리드), 'add' = 합산(오늘 빠른 저장)
+function saveDaily(week, day, value, mode, silent) {
   if (!dailyData[week]) dailyData[week] = {};
-  if (value === '' || value === null || isNaN(value)) delete dailyData[week][day];
-  else dailyData[week][day] = value;
-  flashSaved('저장됨 ↗');
+  if (value === '' || value === null || isNaN(value)) {
+    delete dailyData[week][day];
+  } else {
+    if (mode === 'add') {
+      const prev = (dailyData[week][day] !== undefined && dailyData[week][day] !== '')
+        ? parseFloat(dailyData[week][day]) : 0;
+      dailyData[week][day] = prev + value;
+    } else {
+      dailyData[week][day] = value;
+    }
+  }
+  if (!silent) flashSaved('저장됨 ↗');
   renderAll();
   persistSilently();
 }
@@ -563,8 +581,18 @@ document.getElementById('tabBtnWeek').addEventListener('click', () => switchTab(
 document.getElementById('tabBtnChart').addEventListener('click', () => switchTab('chart'));
 document.getElementById('quickSave').addEventListener('click', () => {
   const { week, day } = todayInfo();
-  const val = document.getElementById('quickInput').value;
-  saveDaily(week, day, val === '' ? '' : parseFloat(val));
+  const inputEl = document.getElementById('quickInput');
+  const val = inputEl.value;
+  if (val === '') return;
+  const numVal = parseFloat(val);
+  const prev = (dailyData[week] && dailyData[week][day] !== undefined && dailyData[week][day] !== '')
+    ? parseFloat(dailyData[week][day]) : 0;
+  const newTotal = prev + numVal;
+  saveDaily(week, day, numVal, 'add', true);
+  inputEl.value = '';
+  const addSign = numVal >= 0 ? '+' : '';
+  const totSign = newTotal >= 0 ? '+' : '';
+  flashSaved(`${addSign}${fmt(numVal)} → 합계 ${totSign}${fmt(newTotal)}`);
 });
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (!confirm('입력한 모든 일별 데이터를 초기화할까?')) return;
