@@ -218,7 +218,7 @@ const FB_DOC_URL  = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/
 async function fbRead() {
   try {
     const res = await fetch(FB_DOC_URL);
-    if (res.status === 404) return { daily: {}, snaps: {} };
+    if (res.status === 404) return { daily: {}, snaps: {} }; // 문서 없음 = 빈 데이터
     if (!res.ok) return null;
     const doc = await res.json();
     const fields = doc.fields || {};
@@ -257,6 +257,7 @@ async function loadAll() {
     storedSnapshots = fb.snaps;
     setSyncStatus('연결됨', true);
   } else {
+    // 로컬스토리지 폴백
     try {
       const d = localStorage.getItem('traid-daily');
       const s = localStorage.getItem('traid-snaps');
@@ -386,8 +387,10 @@ function renderStats(wk) {
 function renderHero(wk, day, today) {
   document.getElementById('weekBadge').textContent  = 'WEEK ' + wk.week;
   document.getElementById('heroSub').textContent    = fmtDate(wk.weekStart) + ' ~ ' + fmtDate(wk.weekEnd) + ' (이번 주)';
-  document.getElementById('todayLabel').textContent = fmtDate(today) + ' · ' + DAY_LABELS[day] + '요일';
+  const KO_DAYS = ['일','월','화','수','목','금','토'];
+  document.getElementById('todayLabel').textContent = fmtDate(today) + ' · ' + KO_DAYS[today.getDay()] + '요일';
   const existing = (dailyData[wk.week] && dailyData[wk.week][day] !== undefined) ? dailyData[wk.week][day] : null;
+  // 입력창은 항상 비워둠 (추가할 금액 입력용)
   const totalEl = document.getElementById('todayTotal');
   if (existing !== null && existing !== '') {
     const sign = existing >= 0 ? '+' : '';
@@ -424,7 +427,7 @@ function renderDays(wk, todayDay) {
     const row = document.createElement('div');
     row.className = 'day-row' + (dayObj.d === todayDay ? ' today' : '');
     row.innerHTML = `
-      <span class="day-date">${DAY_LABELS[dayObj.d]} ${fmtDate(dayObj.date)}</span>
+      <span class="day-date">${['일','월','화','수','목','금','토'][dayObj.date.getDay()]} ${fmtDate(dayObj.date)}</span>
       <input class="day-input mono" type="number" inputmode="decimal" placeholder="0"
              value="${dayObj.val !== null ? dayObj.val : ''}" data-day="${dayObj.d}">
       <span class="day-running">${dayObj.val !== null ? fmt(dayObj.running) : ''}</span>
@@ -538,6 +541,7 @@ function renderWeekHistory(schedule) {
 }
 
 // mode: 'set' = 덮어쓰기(주간 그리드), 'add' = 합산(오늘 빠른 저장)
+// silent: true 면 flashSaved 생략
 function saveDaily(week, day, value, mode, silent) {
   if (!dailyData[week]) dailyData[week] = {};
   if (value === '' || value === null || isNaN(value)) {
