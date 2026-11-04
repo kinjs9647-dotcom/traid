@@ -82,9 +82,11 @@
   .withdrawal-total b{color:var(--rose);font-family:ui-monospace,monospace;}
 
   .mini-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+  .mini-stats.three-col{grid-template-columns:1fr 1fr 1fr;}
   .mini-stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:10px 12px;}
   .mini-stat-label{font-size:10px;color:var(--text-dim);margin-bottom:5px;}
   .mini-stat-value{font-family:ui-monospace,monospace;font-size:16px;font-weight:700;color:var(--text);}
+  .mini-stats.three-col .mini-stat-value{font-size:14px;}
   .mini-stat-value.positive{color:var(--green);}
   .mini-stat-value.negative{color:var(--rose);}
 
@@ -193,7 +195,11 @@
         <button id="withdrawalSave">출금</button>
       </div>
       <div class="withdrawal-total" id="withdrawalTotal"></div>
-      <div class="mini-stats">
+      <div class="mini-stats" id="miniStatsRow">
+        <div class="mini-stat" id="miniStatWithdrawal" style="display:none;">
+          <div class="mini-stat-label">총 출금</div>
+          <div class="mini-stat-value negative" id="metaTotalWithdrawn">—</div>
+        </div>
         <div class="mini-stat">
           <div class="mini-stat-label">이번 달 누적</div>
           <div class="mini-stat-value" id="metaWeekActual">—</div>
@@ -440,8 +446,29 @@ function renderStats(wk) {
   }
 }
 
+function monthWeekLabel(allWeeks, curWk) {
+  // 주의 7일 중 가장 많이 속하는 월 = 대표 월
+  function primaryMonth(wk) {
+    const counts = {};
+    for (let d = 0; d <= 6; d++) {
+      const mk = monthKey(addDays(wk.weekStart, d));
+      counts[mk] = (counts[mk] || 0) + 1;
+    }
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  }
+  const curPrimary = primaryMonth(curWk);
+  let n = 0;
+  for (const wk of allWeeks) {
+    if (primaryMonth(wk) === curPrimary) n++;
+    if (wk.week === curWk.week) break;
+  }
+  const m = parseInt(curPrimary.split('-')[1]);
+  return m + '월 ' + n + '주';
+}
+
 function renderHero(wk, day, today) {
-  document.getElementById('weekBadge').textContent  = 'WEEK ' + wk.week;
+  const allWeeks = buildSchedule();
+  document.getElementById('weekBadge').textContent  = monthWeekLabel(allWeeks, wk);
   document.getElementById('heroSub').textContent    = fmtDate(wk.weekStart) + ' ~ ' + fmtDate(wk.weekEnd) + ' (이번 주)';
   const KO_DAYS = ['일','월','화','수','목','금','토'];
   document.getElementById('todayLabel').textContent = fmtDate(today) + ' · ' + KO_DAYS[today.getDay()] + '요일';
@@ -462,8 +489,13 @@ function renderHero(wk, day, today) {
   document.getElementById('tierPillText').textContent = '목표 비율 ' + wk.tier.label;
 
   const curMKey = monthKey(today);
-  const fullSchedule = buildSchedule();
-  const monthProfit = fullSchedule.filter(s => monthKey(s.weekStart) === curMKey).reduce((sum, s) => sum + s.actualSum, 0);
+  // 각 일별 실제 날짜 기준으로 월 집계 (월경 주차 정확히 처리)
+  const monthProfit = allWeeks.reduce((sum, sw) => {
+    return sum + sw.days.reduce((ds, d) => {
+      if (d.val !== null && monthKey(d.date) === curMKey) return ds + d.val;
+      return ds;
+    }, 0);
+  }, 0);
   const monthTargetProfit = START_BALANCE * tierFor(START_BALANCE).rate;
 
   const actualEl = document.getElementById('metaWeekActual');
@@ -475,13 +507,20 @@ function renderHero(wk, day, today) {
   if (rem <= 0) { remEl.textContent = '+' + fmt(-rem) + ' 초과'; remEl.style.color = 'var(--green)'; }
   else { remEl.textContent = fmt(rem) + ' 남음'; remEl.style.color = 'var(--text)'; }
 
-  // 출금 총액 표시
+  // 총 출금 미니스탯 + 출금 총액 표시
   const totalWithdrawn = withdrawalData.reduce((s, w) => s + w.amount, 0);
   const wTotalEl = document.getElementById('withdrawalTotal');
+  const miniW = document.getElementById('miniStatWithdrawal');
+  const miniRow = document.getElementById('miniStatsRow');
   if (totalWithdrawn > 0) {
-    wTotalEl.innerHTML = `총 출금: <b>${fmt(totalWithdrawn)}</b>`;
+    wTotalEl.innerHTML = '';
+    miniW.style.display = '';
+    document.getElementById('metaTotalWithdrawn').textContent = '-' + fmt(totalWithdrawn);
+    miniRow.classList.add('three-col');
   } else {
     wTotalEl.innerHTML = '';
+    miniW.style.display = 'none';
+    miniRow.classList.remove('three-col');
   }
 }
 
