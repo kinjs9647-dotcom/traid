@@ -198,7 +198,7 @@
   <div class="tab-panel" id="panelChart">
     <div class="card">
       <h2>월별 성장 곡선</h2>
-      <canvas id="monthChart" class="chart-canvas" height="140"></canvas>
+      <canvas id="monthChart" class="chart-canvas" height="165"></canvas>
     </div>
     <div class="card">
       <h2>주차별 실적</h2>
@@ -483,7 +483,7 @@ function renderMonthChart(schedule) {
   canvas.width = canvas.offsetWidth;
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
-  const pad = { t: 14, r: 24, b: 32, l: 52 };
+  const pad = { t: 28, r: 24, b: 32, l: 52 }; // top 여유 확보 (출금 라벨용)
 
   const today = new Date();
   const curMKey = monthKey(today);
@@ -495,12 +495,33 @@ function renderMonthChart(schedule) {
   }
 
   const sortedKeys = Object.keys(monthMap).sort();
+
+  // 각 포인트의 날짜 계산 (출금 마커 x 위치용)
+  const pointDates = [
+    new Date(ORIG_START_DATE),
+    ...sortedKeys.map((k, i) => {
+      const [y, m] = k.split('-').map(Number);
+      return i === sortedKeys.length - 1 ? new Date(today) : new Date(y, m, 0);
+    })
+  ];
+
+  // 특정 날짜까지 누적 출금액
+  function withdrawnUpTo(date) {
+    return withdrawalData
+      .filter(w => new Date(w.date + 'T00:00:00') <= date)
+      .reduce((s, w) => s + w.amount, 0);
+  }
+
+  // 출금 반영한 포인트 값
   const points = [
     { label: '6/15', val: ORIG_START_BALANCE },
-    ...sortedKeys.map((k, i) => ({
-      label: i === sortedKeys.length - 1 ? '현재' : parseInt(k.slice(5)) + '월말',
-      val: monthMap[k],
-    }))
+    ...sortedKeys.map((k, i) => {
+      const pDate = pointDates[i + 1];
+      return {
+        label: i === sortedKeys.length - 1 ? '현재' : parseInt(k.slice(5)) + '월말',
+        val: monthMap[k] - withdrawnUpTo(pDate),
+      };
+    })
   ];
 
   const vals = points.map(p => p.val);
@@ -510,6 +531,17 @@ function renderMonthChart(schedule) {
 
   function px(i) { return pad.l + (i / (n - 1)) * (W - pad.l - pad.r); }
   function py(v) { return pad.t + (1 - (v - minV) / (maxV - minV)) * (H - pad.t - pad.b); }
+
+  // 날짜 → x 좌표 (인접 포인트 사이 보간)
+  function dateToX(date) {
+    for (let i = 0; i < pointDates.length - 1; i++) {
+      if (date >= pointDates[i] && date <= pointDates[i + 1]) {
+        const t = (date - pointDates[i]) / (pointDates[i + 1] - pointDates[i]);
+        return px(i) + t * (px(i + 1) - px(i));
+      }
+    }
+    return date < pointDates[0] ? px(0) : px(n - 1);
+  }
 
   ctx.clearRect(0, 0, W, H);
   ctx.strokeStyle = '#1E2730'; ctx.lineWidth = 1;
@@ -550,6 +582,43 @@ function renderMonthChart(schedule) {
     ctx.textAlign = i === 0 ? 'left' : i === n - 1 ? 'right' : 'center';
     ctx.fillText(p.label, px(i), H - 6);
   });
+
+  // ── 출금 마커 ────────────────────────────────────────
+  if (withdrawalData.length > 0) {
+    const startDate = pointDates[0];
+    const endDate   = pointDates[pointDates.length - 1];
+    withdrawalData.forEach(w => {
+      const wDate = new Date(w.date + 'T00:00:00');
+      if (wDate < startDate || wDate > endDate) return;
+      const x = dateToX(wDate);
+
+      // 차트 선 위의 y 보간
+      let dotY = py((minV + maxV) / 2);
+      for (let i = 0; i < pointDates.length - 1; i++) {
+        if (wDate >= pointDates[i] && wDate <= pointDates[i + 1]) {
+          const t = (wDate - pointDates[i]) / (pointDates[i + 1] - pointDates[i]);
+          dotY = py(vals[i] + t * (vals[i + 1] - vals[i]));
+          break;
+        }
+      }
+
+      // 점선 (위로)
+      ctx.strokeStyle = '#FF5C72'; ctx.lineWidth = 1.5;
+      ctx.setLineDash([3, 2]);
+      ctx.beginPath(); ctx.moveTo(x, dotY - 5); ctx.lineTo(x, dotY - 18); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 붉은 점
+      ctx.fillStyle = '#FF5C72';
+      ctx.beginPath(); ctx.arc(x, dotY, 4, 0, Math.PI * 2); ctx.fill();
+
+      // 출금액 라벨
+      ctx.fillStyle = '#FF5C72';
+      ctx.font = 'bold 8px ui-monospace,monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('-' + fmt(w.amount), x, dotY - 21);
+    });
+  }
 }
 
 function renderWeekHistory(schedule) {
