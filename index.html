@@ -81,9 +81,12 @@
   .withdrawal-total{font-size:12px;color:var(--text-dim);text-align:center;margin-bottom:11px;min-height:18px;}
   .withdrawal-total b{color:var(--rose);font-family:ui-monospace,monospace;}
 
-  .progress-row{display:flex;gap:14px;flex-wrap:wrap;}
-  .meta-item{font-size:11px;color:var(--text-dim);}
-  .meta-item b{color:var(--text);font-family:ui-monospace,monospace;font-size:14px;display:block;margin-top:3px;}
+  .mini-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
+  .mini-stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:10px 12px;}
+  .mini-stat-label{font-size:10px;color:var(--text-dim);margin-bottom:5px;}
+  .mini-stat-value{font-family:ui-monospace,monospace;font-size:16px;font-weight:700;color:var(--text);}
+  .mini-stat-value.positive{color:var(--green);}
+  .mini-stat-value.negative{color:var(--rose);}
 
   /* 카드 */
   .card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:15px 14px;margin-bottom:14px;}
@@ -190,9 +193,15 @@
         <button id="withdrawalSave">출금</button>
       </div>
       <div class="withdrawal-total" id="withdrawalTotal"></div>
-      <div class="progress-row">
-        <div class="meta-item">이번 달 누적<b id="metaWeekActual">—</b></div>
-        <div class="meta-item">월 목표까지<b id="metaRemaining">—</b></div>
+      <div class="mini-stats">
+        <div class="mini-stat">
+          <div class="mini-stat-label">이번 달 누적</div>
+          <div class="mini-stat-value" id="metaWeekActual">—</div>
+        </div>
+        <div class="mini-stat">
+          <div class="mini-stat-label">월 목표까지</div>
+          <div class="mini-stat-value" id="metaRemaining">—</div>
+        </div>
       </div>
     </div>
 
