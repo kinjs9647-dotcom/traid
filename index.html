@@ -45,6 +45,10 @@
   .stat-item{background:var(--surface);border:1px solid var(--border);border-radius:13px;padding:11px 10px;text-align:center;}
   .stat-label{font-size:10px;color:var(--text-dim);margin-bottom:4px;}
   .stat-value{font-family:ui-monospace,monospace;font-size:16px;font-weight:700;}
+  .stat-item.full{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;text-align:left;padding:10px 14px;}
+  .stat-item.full .stat-label{margin-bottom:0;}
+  .stat-item.full .stat-value{font-size:15px;}
+  .stat-item.full .stat-sub{font-size:10px;color:var(--text-dim);font-family:ui-monospace,monospace;}
 
   /* 탭 */
   .tab-bar{display:flex;gap:7px;margin-bottom:14px;}
@@ -153,6 +157,13 @@
     <div class="stat-item">
       <div class="stat-label">총 수익률</div>
       <div class="stat-value mono" id="statReturn">—</div>
+    </div>
+    <div class="stat-item full" id="statCumulativeRow" style="display:none;">
+      <div>
+        <div class="stat-label">누적 시드 (출금 포함)</div>
+        <div class="stat-sub" id="statCumulativeSub"></div>
+      </div>
+      <div class="stat-value mono" id="statCumulative">—</div>
     </div>
   </div>
 
@@ -407,6 +418,17 @@ function renderStats(wk) {
   const el = document.getElementById('statReturn');
   el.textContent = fmtPct(pct);
   el.style.color = pct >= 0 ? 'var(--green)' : 'var(--rose)';
+
+  // 누적 시드 (출금 포함) — 출금이 있을 때만 표시
+  const cumRow = document.getElementById('statCumulativeRow');
+  if (totalWithdrawn > 0) {
+    cumRow.style.display = 'flex';
+    document.getElementById('statCumulative').textContent = fmt(tradeBalance);
+    document.getElementById('statCumulativeSub').textContent =
+      fmt(currentSeed) + ' 보유  +  ' + fmt(totalWithdrawn) + ' 출금';
+  } else {
+    cumRow.style.display = 'none';
+  }
 }
 
 function renderHero(wk, day, today) {
