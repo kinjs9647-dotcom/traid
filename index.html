@@ -401,7 +401,7 @@ function renderStats(wk) {
   const currentSeed  = tradeBalance - totalWithdrawn; // 실제 계좌 잔고
   document.getElementById('statStart').textContent   = fmt(ORIG_START_BALANCE);
   document.getElementById('statCurrent').textContent = fmt(currentSeed);
-  document.getElementById('statTarget').textContent  = fmt(calcMonthTarget(tradeBalance));
+  document.getElementById('statTarget').textContent  = fmt(calcMonthTarget(currentSeed));
   // 총 수익률은 트레이딩 잔고 기준 — 출금해도 변하지 않음
   const pct = (tradeBalance - ORIG_START_BALANCE) / ORIG_START_BALANCE * 100;
   const el = document.getElementById('statReturn');
